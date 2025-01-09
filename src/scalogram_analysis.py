@@ -1,24 +1,33 @@
 import os
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 import pywt
-
-# Path to FFT results CSV file
-base_folder_path = r"C:\Users\Anwender\hochschule-stralsund.de\Jan-Christian Kuhr - 1 Dr. Diestel GmbH\4 Abschlussarbeiten\Masterarbeit Talaviya\Measurement\sanket.talaviya\Measurments_Data"
-fft_results_csv_path = os.path.join(base_folder_path, "fft_results.csv")
-
-# Load FFT results
-fft_results = pd.read_csv(fft_results_csv_path)
-# Sampling frequency (define the same value as in fft_analysis.py)
-sampling_frequency = 1002.13
+from src.load_data import load_data  # Import the load_data function
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
 
 
-# Define a function to generate a scalogram
-def generate_scalogram(folder, axis, sampling_frequency):
-    # Filter FFT results for the selected folder and axis
-    filtered_data = fft_results[(fft_results['Folder'] == folder) & (fft_results['Axis'] == axis)]
-    signal = filtered_data['Magnitude'].values  # Use magnitude as the signal
+
+# Define constants
+root_folder = r"C:\Users\Anwender\hochschule-stralsund.de\Jan-Christian Kuhr - 1 Dr. Diestel GmbH\2 Wissenschaftliche Literatur\Abschlussarbeiten\Talaviya (Masterarbeit)\Measurement"
+measurement_folders = ["31", "32", "34"]
+sampling_frequency = 1002.13  # Sampling frequency
+
+# Load measurement data into a pandas DataFrame
+data = load_data(root_folder, measurement_folders)
+
+def generate_and_save_scalogram(df, folder, axis, sampling_frequency):
+    """
+    Generate and save a scalogram for a given folder and axis.
+    If a scalogram image already exists, replace it with the new one.
+    """
+    # Filter data for the specified folder and axis
+    filtered_data = df[df['folder'] == folder]
+    if axis not in filtered_data:
+        print(f"No data found for axis {axis} in folder {folder}")
+        return
+
+    signal = filtered_data[axis].values  # Extract signal for the given axis
 
     # Perform Continuous Wavelet Transform (CWT)
     scales = np.arange(1, 128)  # Define scales
@@ -31,14 +40,25 @@ def generate_scalogram(folder, axis, sampling_frequency):
         np.abs(coefficients),
         extent=[0, len(signal) / sampling_frequency, frequencies[-1], frequencies[0]],
         aspect='auto',
-        cmap='gray'  # Use grayscale colormap
+        cmap='gray'  # Grayscale colormap
     )
     plt.colorbar(label='Magnitude')
-    plt.title(f"Grayscale Scalogram - Folder {folder} - {axis} Axis")
+    plt.title(f"Grayscale Scalogram - Folder {folder} - {axis.upper()} Axis")
     plt.xlabel("Time (s)")
     plt.ylabel("Frequency (Hz)")
-    plt.show()
 
+    # Save scalogram image in the same folder
+    output_folder = os.path.join(root_folder, folder)
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
 
-# Example usage: Generate scalogram for folder 39, X-Axis
-generate_scalogram(folder=39, axis='X', sampling_frequency=sampling_frequency)
+    output_file = os.path.join(output_folder, f"scalogram_{axis.lower()}.png")
+    plt.savefig(output_file)
+    plt.close()
+    print(f"Scalogram saved: {output_file}")
+
+# Iterate through measurement folders and axes to generate scalograms
+axes = ['x', 'y', 'z']
+for folder in measurement_folders:
+    for axis in axes:
+        generate_and_save_scalogram(data, folder, axis, sampling_frequency)
